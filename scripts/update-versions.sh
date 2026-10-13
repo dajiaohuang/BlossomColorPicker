@@ -99,11 +99,12 @@ pkgs.forEach(p => {
     p.content.version = p.newVersion;
     
     const updateDeps = (deps) => {
-      if (deps && deps[coreName] && newCoreVersion) {
-        deps[coreName] = `^${newCoreVersion}`;
-        return true;
-      }
-      return false;
+      if (!deps || !deps[coreName] || !newCoreVersion) return false;
+      // `workspace:` ranges are rewritten by pnpm at publish time and must
+      // keep matching the lockfile, so leave them alone.
+      if (deps[coreName].startsWith("workspace:")) return false;
+      deps[coreName] = `^${newCoreVersion}`;
+      return true;
     };
 
     updateDeps(p.content.dependencies);
