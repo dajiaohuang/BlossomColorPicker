@@ -21,11 +21,11 @@ Blossom Color Picker の単体コアパッケージと各フレームワーク�
 | `disabled`            | `boolean`                                  | `false`                                                   | 操作を無効化します。                                                                     |
 | `openOnHover`         | `boolean`                                  | `false`                                                   | ホバーで展開するかどうか。                                                               |
 | `initialExpanded`     | `boolean`                                  | `false`                                                   | 初期状態で展開するかどうか。                                                             |
-| `animationDuration`   | `number`                                   | `300`                                                     | ブルームアニメーションの時間（ms）。                                                     |
+| `animationDuration`   | `number`                                   | `280`                                                     | ブルームアニメーションの基準時間（ms）。各フェーズはこの値に比例します。                 |
 | `showAlphaSlider`     | `boolean`                                  | `true`                                                    | 花びらの外側にあるアークスライダーを表示するかどうか。                                   |
 | `coreSize`            | `number`                                   | `32`                                                      | 中心コアボタンの直径（px）。                                                             |
 | `petalSize`           | `number`                                   | `32`                                                      | 各花びらの直径（px）。                                                                   |
-| `showCoreColor`       | `boolean`                                  | `true`                                                    | コアに選択中の色を表示するかどうか。                                                     |
+| `showCoreColor`       | `boolean`                                  | `false`                                                   | `true` なら選択中の色を表示し、`false` なら展開中のコアは白になります。                  |
 | `sliderPosition`      | `'top' \| 'bottom' \| 'left' \| 'right'`   | `undefined`                                               | アークスライダーの固定位置。未指定の場合は右側から始まり、自動調整される場合があります。 |
 | `adaptivePositioning` | `boolean`                                  | `true`                                                    | 展開後のピッカーとアークスライダーを表示領域内に収めるよう自動調整します。               |
 | `circularBarWidth`    | `number`                                   | `12`                                                      | 円形の色相バーの幅（px）。                                                               |
@@ -33,7 +33,13 @@ Blossom Color Picker の単体コアパッケージと各フレームワーク�
 | `sliderOffset`        | `number`                                   | `30`                                                      | 花びらと外側アークスライダーの距離。                                                     |
 | `collapsible`         | `boolean`                                  | `true`                                                    | 折りたたみを許可するかどうか。                                                           |
 
-`ChromePicker` も同じオプションを使いますが、`collapsible` のデフォルト値は `false` です。
+`ChromePicker` も同じオプションを使いますが、`collapsible: false`、`animationDuration: 300`、`showCoreColor: true` がデフォルトです。
+
+## アニメーションのタイミング
+
+`animationDuration` はアニメーション全体の長さではなく、ブルームのタイムラインの基準単位です。花びらが順番に開いて軽くバウンドし、続いてリングとアークスライダーが現れるため、デフォルトの `280` では、開いてから約 550 ms、閉じてから約 520 ms で完全に静止します。値を増減すると、すべてのフェーズが比例して伸縮します。
+
+ユーザーが `prefers-reduced-motion: reduce` を有効にしている場合、ピッカーはこれらのトランジションを省略し、状態を即座に切り替えます。
 
 ## フレームワークごとのイベント名
 

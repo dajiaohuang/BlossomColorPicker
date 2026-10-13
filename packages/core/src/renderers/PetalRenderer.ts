@@ -1,4 +1,16 @@
-import { BLOOM_EASING } from '../constants';
+import {
+  BLOOM_CLOSE_EASING,
+  COLLAPSE_DELAY,
+  COLLAPSE_DURATION,
+  PETAL_CLOSE_DELAY,
+  PETAL_CLOSE_DURATION,
+  PETAL_CLOSE_EASING,
+  PETAL_COLLAPSED_SCALE,
+  PETAL_FADE_DURATION,
+  PETAL_START_RADIUS,
+  PETAL_TRAVEL_DURATION,
+  bloomTime,
+} from '../constants';
 import { createElement, setStyles } from '../dom-helpers';
 import { hslToString, hslaToString } from '../utils';
 
@@ -12,6 +24,7 @@ export interface PetalConfig {
   radius: number;
   animationDuration: number;
   staggerDelay: number;
+  openEasing: string;
   zIndex: number;
   rotationOffset: number;
   alpha: number;
@@ -25,6 +38,7 @@ export class PetalRenderer {
   public el: HTMLButtonElement;
   private config: PetalConfig;
   private isHovered = false;
+  private bloomEndTime = 0;
 
   constructor(
     config: PetalConfig,
@@ -79,6 +93,8 @@ export class PetalRenderer {
       top: '50%',
       marginLeft: `${-petalSize / 2}px`,
       marginTop: `${-petalSize / 2}px`,
+      transformOrigin: 'center center',
+      willChange: 'transform, scale, opacity',
     });
 
     // Use strict 50% split. The Underlay petal will handle the gap seam.
@@ -109,15 +125,41 @@ export class PetalRenderer {
     const c = this.config;
     const isHovered = this.isHovered;
     const isInvisible = c.alpha === 0;
+    const t = (ms: number) => bloomTime(ms, c.animationDuration);
+    // Opening: petals fan out one after another.
+    // Closing: they hold while the ring fades, then fold back together.
+    const duration = t(
+      isExpanded ? PETAL_TRAVEL_DURATION : PETAL_CLOSE_DURATION
+    );
+    const easing = isExpanded ? c.openEasing : PETAL_CLOSE_EASING;
+    const delay = isExpanded ? c.staggerDelay : t(PETAL_CLOSE_DELAY);
+    // Size and opacity only change during the fold itself, after the wind-up.
+    const fadeDuration = t(
+      isExpanded ? PETAL_FADE_DURATION : COLLAPSE_DURATION
+    );
+    const fadeDelay = isExpanded ? delay : t(COLLAPSE_DELAY);
 
-    const angle = (c.index / c.totalPetals) * 360 - 90 + c.rotationOffset;
-    const radian = (angle * Math.PI) / 180;
-    let x = Math.cos(radian) * c.radius;
-    let y = Math.sin(radian) * c.radius;
+    if (isExpanding) {
+      this.bloomEndTime = performance.now() + delay + duration;
+    } else if (!isExpanded) {
+      this.bloomEndTime = 0;
+    }
+    const isBlooming = isExpanded && performance.now() < this.bloomEndTime;
 
-    // Subtle push effect from demo.tsx
-    // Only apply if mousePos is valid (user has moved mouse)
-    if (isExpanded && mousePos && !isHovered && !isInvisible) {
+    // Final bloom position
+    const finalAngle = (c.index / c.totalPetals) * 360 - 90 + c.rotationOffset;
+    const finalRadian = (finalAngle * Math.PI) / 180;
+    let x = Math.cos(finalRadian) * c.radius;
+    let y = Math.sin(finalRadian) * c.radius;
+
+    // Petals begin near the center and travel straight outward.
+    const startRadian = finalRadian;
+    const startRadius = c.radius * PETAL_START_RADIUS;
+    const startX = Math.cos(startRadian) * startRadius;
+    const startY = Math.sin(startRadian) * startRadius;
+
+    // Subtle push effect when expanded and user moves mouse
+    if (isExpanded && !isBlooming && mousePos && !isHovered && !isInvisible) {
       const dx = x - mousePos.x;
       const dy = y - mousePos.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -136,26 +178,31 @@ export class PetalRenderer {
         ? hslaToString(c.hue, c.saturation, c.lightness, c.alpha * 100)
         : hslToString(c.hue, c.saturation, c.lightness);
 
-    const scale = isHovered ? 1.1 : 1;
+    const scale = isHovered && !isBlooming ? 1.1 : 1;
 
-    // Use fast transition only if:
-    // 1. Picker already expanded (not currently expanding)
-    // 2. Mouse is active (mousePos exists)
-    // 3. Not hovering this specific petal
+    // Use fast transition when hovering/moving mouse while already expanded
     const transformTransition =
-      isExpanded && !isExpanding && mousePos && !isHovered
+      isExpanded && !isBlooming && mousePos && !isHovered
         ? 'transform 150ms ease-out'
-        : `transform ${c.animationDuration}ms ${BLOOM_EASING} ${isExpanded && !isHovered ? c.staggerDelay : 0}ms`;
+        : `transform ${duration}ms ${easing} ${delay}ms`;
+
+    const transform = isExpanded
+      ? `translate(${x}px, ${y}px)`
+      : `translate(${startX}px, ${startY}px)`;
+    const scaleTransition =
+      isExpanded && !isBlooming
+        ? 'scale 150ms ease-out'
+        : `scale ${fadeDuration}ms ${isExpanded ? 'ease-out' : BLOOM_CLOSE_EASING} ${fadeDelay}ms`;
 
     setStyles(this.el, {
       backgroundColor: color,
-      transform: isExpanded
-        ? `translate(${x}px, ${y}px) scale(${scale})`
-        : 'translate(0, 0) scale(0)',
+      transform,
+      scale: isExpanded ? String(scale) : String(PETAL_COLLAPSED_SCALE),
       opacity: isExpanded ? '1' : '0',
       filter: isHovered && !isInvisible ? 'brightness(1.1)' : 'brightness(1)',
       transition: `${transformTransition},
-                   opacity ${c.animationDuration}ms ${BLOOM_EASING} ${isExpanded && !isHovered ? c.staggerDelay : 0}ms,
+                   ${scaleTransition},
+                   opacity ${fadeDuration}ms linear ${fadeDelay}ms,
                    background-color 200ms ease,
                    box-shadow 200ms ease,
                    filter 200ms ease`,
@@ -166,7 +213,7 @@ export class PetalRenderer {
             : '0 2px 6px rgba(0,0,0,0.15)'
           : 'none',
       zIndex: String(c.zIndex),
-      pointerEvents: c.pointerEvents,
+      pointerEvents: isExpanded ? c.pointerEvents : 'none',
     });
 
     this.el.tabIndex = isExpanded ? 0 : -1;

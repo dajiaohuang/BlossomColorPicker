@@ -142,7 +142,11 @@ function getChromeOptions(props: any, onChange: any, onCollapse: any) {
 
 export const BlossomColorPicker = defineComponent({
   name: 'BlossomColorPicker',
-  props: commonProps,
+  props: {
+    ...commonProps,
+    animationDuration: { type: Number, default: 280 },
+    showCoreColor: { type: Boolean, default: false },
+  },
   emits: ['change', 'collapse'],
   setup(props, { emit }) {
     const containerRef = ref<HTMLElement | null>(null);

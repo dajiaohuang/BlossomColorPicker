@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Animation
+
+- **Reworked bloom animation**
+  - Petals now fan open one after another (outer ring clockwise, inner rings alternating) and land with a jelly-like overshoot.
+  - The colour ring swells past full size and settles, followed by the arc slider.
+  - Closing winds up before folding back, and the trigger button pops in with a short bounce.
+  - `animationDuration` (default now `280`) is the base unit of this timeline; every phase scales with it.
+  - Transitions are skipped when `prefers-reduced-motion: reduce` is set.
+
+### Changes
+
+- `showCoreColor` now defaults to `false` for `BlossomColorPicker`; `ChromePicker` keeps `true`.
+- Collapsible pickers render a dedicated trigger button that cross-fades with the expanded core.
+- The default palette is laid out with yellow at 12 o'clock, running warm to cool clockwise.
+
+### Website & Docs
+
+- Demo palettes for the multi-layer example are generated as a colour wheel that follows the picker's ring layout.
+- Documented the animation timing in all localized option references.
+
 ## v2.3.0 (2026-09-07)
 
 - Upgrade to Vite 8, Next.js 16.3, Svelte 5.57, and current Fumadocs and Tailwind releases.

@@ -1,4 +1,15 @@
-import { BLOOM_EASING } from '../constants';
+import {
+  RING_CLOSE_DELAY,
+  RING_CLOSE_DURATION,
+  RING_FADE_DELAY,
+  RING_FADE_DURATION,
+  RING_CLOSE_SPRING_DURATION,
+  RING_CLOSE_SPRING_EASING,
+  RING_COLLAPSED_SCALE,
+  RING_SPRING_DURATION,
+  RING_SPRING_EASING,
+  bloomTime,
+} from '../constants';
 import { createSVGElement, setStyles } from '../dom-helpers';
 import { hslaToString } from '../utils';
 
@@ -24,6 +35,7 @@ export class ColorBarRenderer {
       marginLeft: `${-size / 2}px`,
       marginTop: `${-size / 2}px`,
       zIndex: '5',
+      willChange: 'transform, opacity',
     });
 
     const cx = String(size / 2);
@@ -62,10 +74,16 @@ export class ColorBarRenderer {
     const color = hslaToString(hue, saturation, lightness, alpha);
     this.colorCircle.setAttribute('stroke', color);
 
+    // The ring rides the container scale with its own jelly wobble and lets
+    // its color settle in after the first petals; on close it fades out in
+    // place before they fold.
+    const t = (ms: number) => bloomTime(ms, this.animationDuration);
     setStyles(this.el, {
       opacity: isExpanded ? '1' : '0',
-      transform: isExpanded ? 'scale(1)' : 'scale(0.8)',
-      transition: `opacity ${this.animationDuration}ms ${BLOOM_EASING}, transform ${this.animationDuration}ms ${BLOOM_EASING}`,
+      transform: isExpanded ? 'scale(1)' : `scale(${RING_COLLAPSED_SCALE})`,
+      transition: isExpanded
+        ? `opacity ${t(RING_FADE_DURATION)}ms linear ${t(RING_FADE_DELAY)}ms, transform ${t(RING_SPRING_DURATION)}ms ${RING_SPRING_EASING}`
+        : `opacity ${t(RING_CLOSE_DURATION)}ms linear ${t(RING_CLOSE_DELAY)}ms, transform ${t(RING_CLOSE_SPRING_DURATION)}ms ${RING_CLOSE_SPRING_EASING}`,
     });
   }
 

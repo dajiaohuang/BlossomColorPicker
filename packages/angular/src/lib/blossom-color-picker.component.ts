@@ -37,11 +37,11 @@ export class BlossomColorPickerComponent
   @Input() disabled = false;
   @Input() openOnHover = false;
   @Input() initialExpanded = false;
-  @Input() animationDuration = 300;
+  @Input() animationDuration = 280;
   @Input() showAlphaSlider = true;
   @Input() coreSize = 32;
   @Input() petalSize = 32;
-  @Input() showCoreColor = true;
+  @Input() showCoreColor = false;
   @Input() sliderPosition?: SliderPosition;
   @Input() adaptivePositioning = true;
   @Input() circularBarWidth?: number;

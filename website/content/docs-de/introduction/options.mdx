@@ -21,11 +21,11 @@ Das eigenständige Kernpaket und alle Framework-Wrapper von Blossom Color Picker
 | `disabled`            | `boolean`                                  | `false`                                                   | Deaktiviert die Interaktion.                                                                           |
 | `openOnHover`         | `boolean`                                  | `false`                                                   | Öffnet den Picker beim Hover.                                                                          |
 | `initialExpanded`     | `boolean`                                  | `false`                                                   | Startet den Picker geöffnet.                                                                           |
-| `animationDuration`   | `number`                                   | `300`                                                     | Dauer der Bloom-Animation in Millisekunden.                                                            |
+| `animationDuration`   | `number`                                   | `280`                                                     | Basisdauer der Bloom-Animation in Millisekunden. Alle Phasen skalieren mit diesem Wert.                |
 | `showAlphaSlider`     | `boolean`                                  | `true`                                                    | Zeigt den äußeren Bogenslider an.                                                                      |
 | `coreSize`            | `number`                                   | `32`                                                      | Durchmesser des Kernbuttons in Pixeln.                                                                 |
 | `petalSize`           | `number`                                   | `32`                                                      | Durchmesser jedes Blütenblatts in Pixeln.                                                              |
-| `showCoreColor`       | `boolean`                                  | `true`                                                    | Zeigt die aktuelle Farbe im Kern an.                                                                   |
+| `showCoreColor`       | `boolean`                                  | `false`                                                   | Zeigt bei `true` die gewählte Farbe im Kern; andernfalls ist der geöffnete Kern weiß.                  |
 | `sliderPosition`      | `'top' \| 'bottom' \| 'left' \| 'right'`   | `undefined`                                               | Feste Position des Bogensliders. Ohne Angabe startet er rechts und kann automatisch verschoben werden. |
 | `adaptivePositioning` | `boolean`                                  | `true`                                                    | Verschiebt den geöffneten Picker und den Bogenslider automatisch in den sichtbaren Bereich.            |
 | `circularBarWidth`    | `number`                                   | `12`                                                      | Breite des kreisförmigen Hue-Balkens in Pixeln.                                                        |
@@ -33,7 +33,13 @@ Das eigenständige Kernpaket und alle Framework-Wrapper von Blossom Color Picker
 | `sliderOffset`        | `number`                                   | `30`                                                      | Abstand zwischen Blütenblättern und äußerem Bogenslider.                                               |
 | `collapsible`         | `boolean`                                  | `true`                                                    | Erlaubt das Einklappen des Pickers.                                                                    |
 
-Für `ChromePicker` gilt dieselbe Optionsmenge, allerdings mit `collapsible = false` als Standard.
+Für `ChromePicker` gelten dieselben Optionen, jedoch mit `collapsible: false`, `animationDuration: 300` und `showCoreColor: true` als Standard.
+
+## Animationsdauer
+
+`animationDuration` ist die Basiseinheit der Bloom-Zeitleiste und nicht ihre Gesamtlänge. Die Blütenblätter fächern nacheinander auf und federn leicht nach, danach folgen der Ring und der Bogenslider. Beim Standardwert `280` kommt der Picker daher etwa 550 ms nach dem Öffnen und etwa 520 ms nach dem Schließen zur Ruhe. Ein höherer oder niedrigerer Wert skaliert alle Phasen proportional.
+
+Hat der Nutzer `prefers-reduced-motion: reduce` aktiviert, überspringt der Picker diese Übergänge und wechselt den Zustand sofort.
 
 ## Ereignisnamen je Framework
 

@@ -21,11 +21,11 @@ Blossom Color Picker 的獨立核心套件與所有框架封裝都共用同一�
 | `disabled`            | `boolean`                                  | `false`                                                   | 是否停用互動。                                               |
 | `openOnHover`         | `boolean`                                  | `false`                                                   | 是否在滑鼠懸停時展開。                                       |
 | `initialExpanded`     | `boolean`                                  | `false`                                                   | 初始是否展開。                                               |
-| `animationDuration`   | `number`                                   | `300`                                                     | 綻放動畫時長，單位為毫秒。                                   |
+| `animationDuration`   | `number`                                   | `280`                                                     | 綻放動畫的基準時長（毫秒），各階段依此值等比縮放。           |
 | `showAlphaSlider`     | `boolean`                                  | `true`                                                    | 是否顯示花瓣外側的弧形滑桿。                                 |
 | `coreSize`            | `number`                                   | `32`                                                      | 中心核心按鈕直徑，單位為像素。                               |
 | `petalSize`           | `number`                                   | `32`                                                      | 單個花瓣直徑，單位為像素。                                   |
-| `showCoreColor`       | `boolean`                                  | `true`                                                    | 是否在核心區域顯示目前選中顏色。                             |
+| `showCoreColor`       | `boolean`                                  | `false`                                                   | 為 `true` 時顯示選取的顏色；為 `false` 時展開的花心為白色。  |
 | `sliderPosition`      | `'top' \| 'bottom' \| 'left' \| 'right'`   | `undefined`                                               | 固定弧形滑桿位置。若未傳入，初始會從右側開始，並可自動調整。 |
 | `adaptivePositioning` | `boolean`                                  | `true`                                                    | 自動調整展開後的選擇器與弧形滑桿位置，使其盡量保持在視口內。 |
 | `circularBarWidth`    | `number`                                   | `12`                                                      | 圓形色相條寬度，單位為像素。                                 |
@@ -33,7 +33,13 @@ Blossom Color Picker 的獨立核心套件與所有框架封裝都共用同一�
 | `sliderOffset`        | `number`                                   | `30`                                                      | 花瓣與外側弧形滑桿之間的距離。                               |
 | `collapsible`         | `boolean`                                  | `true`                                                    | 是否允許收合。                                               |
 
-`ChromePicker` 使用相同的選項集合，只是 `collapsible` 的預設值為 `false`。
+`ChromePicker` 使用相同的選項，但預設值為 `collapsible: false`、`animationDuration: 300` 和 `showCoreColor: true`。
+
+## 動畫時長
+
+`animationDuration` 是綻放時間軸的基準單位，而不是動畫的總時長。花瓣依序展開並帶有輕微回彈，接著是色環與弧形滑桿，因此在預設值 `280` 下，選擇器在展開後約 550 毫秒、收合後約 520 毫秒完全靜止。調大或調小該值會讓所有階段等比縮放。
+
+當使用者開啟了 `prefers-reduced-motion: reduce` 時，選擇器會略過這些轉場，直接切換狀態。
 
 ## 各框架事件名稱
 
