@@ -1,5 +1,6 @@
 'use client';
 
+import { organizeColorsIntoLayers } from '@dayflow/blossom-color-picker';
 import {
   BlossomColorPicker,
   ChromePicker,
@@ -7,54 +8,48 @@ import {
 } from '@dayflow/blossom-color-picker-react';
 import React, { useMemo, useState } from 'react';
 
-const colorPalette = [
-  // --- Layer 1: Outermost (12 Colors) ---
-  '#E67700',
-  '#D9480F',
-  '#C92A2A',
-  '#A61E4D',
-  '#862E9C',
-  '#5F3DC4',
-  '#364FC7',
-  '#1864AB',
-  '#0B7285',
-  '#087F5B',
-  '#2B8A3E',
-  '#5C940D',
-  // --- Layer 2: Middle-Outer (12 Colors) ---
-  '#FCC419',
-  '#FF922B',
-  '#FF6B6B',
-  '#F06595',
-  '#CC5DE8',
-  '#845EF7',
-  '#5C7CFA',
-  '#339AF0',
-  '#22B8CF',
-  '#20C997',
-  '#51CF66',
-  '#94D82D',
-  // --- Layer 3: Middle-Inner (12 Colors) ---
-  '#FFE066',
-  '#FFC078',
-  '#FFA8A8',
-  '#FCC2D7',
-  '#E599F7',
-  '#B197FC',
-  '#91A7FF',
-  '#74C0FC',
-  '#66D9E8',
-  '#63E6BE',
-  '#8CE99A',
-  '#C0EB75',
-  // --- Layer 4: Innermost (6 Colors) ---
-  '#FFF9DB',
-  '#FFF5F5',
-  '#F3D9FA',
-  '#E7F5FF',
-  '#E6FCF5',
-  '#F4FCE3',
-];
+const MAX_COLOR_COUNT = 42;
+
+// Lightness / saturation of each ring, innermost first.
+const RING_TONES: Record<number, { s: number; l: number }[]> = {
+  1: [{ s: 76, l: 66 }],
+  2: [
+    { s: 88, l: 87 },
+    { s: 74, l: 64 },
+  ],
+  3: [
+    { s: 88, l: 90 },
+    { s: 80, l: 77 },
+    { s: 72, l: 63 },
+  ],
+  4: [
+    { s: 90, l: 92 },
+    { s: 85, l: 82 },
+    { s: 78, l: 72 },
+    { s: 70, l: 61 },
+  ],
+};
+
+// Builds a colour wheel for the picker's own ring layout: hue follows the
+// angle on every ring and each ring keeps a single tone, so the bloom reads
+// as one continuous wheel that gets lighter towards the centre.
+function buildWheelPalette(count: number) {
+  // Ask the picker how it will split `count` colours into rings.
+  const ringSizes = organizeColorsIntoLayers(
+    Array.from({ length: count }, (_, i) => ({ h: 0, s: 0, l: count - i }))
+  ).map(ring => ring.length);
+  const tones = RING_TONES[ringSizes.length];
+
+  return ringSizes.flatMap((size, ringIdx) => {
+    const step = 360 / size;
+    // Rings after the first are rotated by half a petal of the ring inside.
+    const rotation = ringIdx === 0 ? 0 : 180 / ringSizes[ringIdx - 1];
+    return Array.from({ length: size }, (_, i) => ({
+      h: Math.round(i * step + (rotation % step)) % 360,
+      ...tones[ringIdx],
+    }));
+  });
+}
 
 export function BlossomColorPickerShowcase() {
   const [basicColor, setBasicColor] = useState<BlossomColorPickerValue>({
@@ -76,7 +71,7 @@ export function BlossomColorPickerShowcase() {
   const [activePos, setActivePos] = useState<
     'top' | 'bottom' | 'left' | 'right'
   >('left');
-  const [colorCount, setColorCount] = useState(42);
+  const [colorCount, setColorCount] = useState(MAX_COLOR_COUNT);
   const [isPickerExpanded, setIsPickerExpanded] = useState(false);
   const [multiLayerColor, setMultiLayerColor] =
     useState<BlossomColorPickerValue>({
@@ -88,7 +83,7 @@ export function BlossomColorPickerShowcase() {
     });
 
   const dynamicPalette = useMemo(
-    () => colorPalette.slice(0, colorCount),
+    () => buildWheelPalette(colorCount),
     [colorCount]
   );
 
@@ -109,6 +104,7 @@ export function BlossomColorPickerShowcase() {
               coreSize={44}
               petalSize={44}
               sliderWidth={24}
+              showCoreColor
             />
           </div>
         </div>
@@ -139,6 +135,7 @@ export function BlossomColorPickerShowcase() {
                   coreSize={48}
                   petalSize={36}
                   sliderWidth={18}
+                  showCoreColor
                   onCollapse={() => setIsPickerExpanded(false)}
                 />
               </div>
@@ -167,7 +164,7 @@ export function BlossomColorPickerShowcase() {
                       const val = parseInt(e.target.value);
                       if (!isNaN(val)) {
                         setColorCount(
-                          Math.max(1, Math.min(colorPalette.length, val))
+                          Math.max(1, Math.min(MAX_COLOR_COUNT, val))
                         );
                         setIsPickerExpanded(true);
                       }
@@ -177,7 +174,7 @@ export function BlossomColorPickerShowcase() {
                   <button
                     onClick={() => {
                       setColorCount(prev =>
-                        Math.min(colorPalette.length, prev + 1)
+                        Math.min(MAX_COLOR_COUNT, prev + 1)
                       );
                       setIsPickerExpanded(true);
                     }}

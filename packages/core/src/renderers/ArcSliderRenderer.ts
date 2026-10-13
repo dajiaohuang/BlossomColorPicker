@@ -5,7 +5,13 @@ import {
   calculateSliderValueFromPoint,
   calculateArcGradientColors,
 } from '../arc-geometry';
-import { BLOOM_EASING, ARC_GRADIENT_STEPS } from '../constants';
+import {
+  SLIDER_CLOSE_DURATION,
+  SLIDER_FADE_DELAY,
+  SLIDER_FADE_DURATION,
+  ARC_GRADIENT_STEPS,
+  bloomTime,
+} from '../constants';
 import { createSVGElement, setStyles, setAttributes } from '../dom-helpers';
 import type { SliderPosition } from '../types';
 import {
@@ -71,6 +77,7 @@ export class ArcSliderRenderer {
       marginLeft: `${-this.svgSize / 2}px`,
       marginTop: `${-this.svgSize / 2}px`,
       zIndex: '50',
+      willChange: 'opacity',
     });
 
     // Create defs + gradient
@@ -284,20 +291,34 @@ export class ArcSliderRenderer {
 
     this.updateHandleTransition();
 
-    // Show/hide
+    // The arc is the last beat of the bloom and the first thing to leave.
+    const delay = isExpanded
+      ? bloomTime(SLIDER_FADE_DELAY, this.animationDuration)
+      : 0;
+    const duration = bloomTime(
+      isExpanded ? SLIDER_FADE_DURATION : SLIDER_CLOSE_DURATION,
+      this.animationDuration
+    );
+
     setStyles(this.el, {
       opacity: isExpanded ? '1' : '0',
-      transform: isExpanded ? 'scale(1)' : 'scale(0.8)',
-      transition: `opacity ${this.animationDuration}ms ${BLOOM_EASING} ${this.animationDuration / 2}ms, transform ${this.animationDuration}ms ${BLOOM_EASING} ${this.animationDuration / 2}ms`,
+      pointerEvents: isExpanded ? 'auto' : 'none',
+      transition: `opacity ${duration}ms linear ${delay}ms`,
     });
-  }
 
-  private updateHandleTransition(): void {
     setStyles(this.handle, {
       transition: this.isDragging
         ? 'none'
         : `cx ${this.animationDuration / 3}ms ease, cy ${this.animationDuration / 3}ms ease`,
     });
+  }
+
+  private updateHandleTransition(): void {
+    if (this.isDragging) {
+      setStyles(this.handle, {
+        transition: 'none',
+      });
+    }
   }
 
   destroy(): void {

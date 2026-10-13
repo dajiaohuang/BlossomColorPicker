@@ -57,6 +57,8 @@ export class ChromePicker {
     this.opts = {
       ...options,
       collapsible: options?.collapsible ?? false, // Default to expanded for ChromePicker
+      showCoreColor: options?.showCoreColor ?? true,
+      animationDuration: options?.animationDuration ?? 300,
     };
     this.boundThemeChange = () => {
       if (this.opts.darkMode === undefined) {

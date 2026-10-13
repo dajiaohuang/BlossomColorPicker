@@ -46,14 +46,16 @@ Supports all props from the core `BlossomColorPickerOptions`.
 | `disabled`            | `boolean`                                | `false`     |
 | `openOnHover`         | `boolean`                                | `false`     |
 | `initialExpanded`     | `boolean`                                | `false`     |
-| `animationDuration`   | `number`                                 | `300`       |
+| `animationDuration`   | `number`                                 | `280`       | Base timing of the blooming animation in ms; every phase scales with it (at the default the bloom settles in about 550 ms). |
 | `showAlphaSlider`     | `boolean`                                | `true`      |
 | `coreSize`            | `number`                                 | `32`        |
 | `petalSize`           | `number`                                 | `32`        |
-| `showCoreColor`       | `boolean`                                | `true`      |
+| `showCoreColor`       | `boolean`                                | `false`     |
 | `sliderPosition`      | `'top' \| 'bottom' \| 'left' \| 'right'` | `undefined` |
 | `adaptivePositioning` | `boolean`                                | `true`      |
 | `class`               | `string`                                 | `""`        |
+
+With the default `showCoreColor={false}`, the core is white while expanded.
 
 ## Events
 

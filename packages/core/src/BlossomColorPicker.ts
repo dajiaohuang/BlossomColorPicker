@@ -14,12 +14,33 @@ function colorsEqual(a: ColorInput[], b: ColorInput[]): boolean {
   return true;
 }
 
+function clockwiseHueOrder(hue: number): number {
+  return (50 - hue + 360) % 360;
+}
+
 import { computeAdaptivePosition } from './adaptive';
 import {
   DEFAULT_COLORS,
-  BLOOM_EASING,
+  DEFAULT_ANIMATION_DURATION,
+  BLOOM_OPEN_EASING,
+  BLOOM_CLOSE_EASING,
+  BLOOM_COLLAPSED_SCALE,
+  BLOOM_SCALE_DELAY,
+  BLOOM_SCALE_DURATION,
+  COLLAPSE_DELAY,
+  COLLAPSE_DURATION,
+  TRIGGER_FADE_DURATION,
+  TRIGGER_COLLAPSED_SCALE,
+  TRIGGER_POP_DELAY,
+  TRIGGER_POP_DURATION,
+  TRIGGER_POP_EASING,
+  PETAL_SWEEP,
+  PETAL_SWEEP_EASE,
+  PETAL_OVERSHOOT_FIRST,
+  PETAL_OVERSHOOT_LAST,
+  petalSpringEasing,
   HOVER_DELAY,
-  PETAL_STAGGER,
+  bloomTime,
   BAR_GAP,
   BAR_WIDTH,
   SLIDER_OFFSET,
@@ -83,6 +104,9 @@ export class BlossomColorPicker {
   private mousePos: { x: number; y: number } | null = null;
   private rafId: number | null = null;
 
+  private triggerBtn: HTMLButtonElement | null = null;
+  private isFirstRender = true;
+
   // Options
   private opts: Required<
     Omit<BlossomColorPickerOptions, 'value' | 'defaultValue' | 'sliderPosition'>
@@ -140,11 +164,12 @@ export class BlossomColorPicker {
       disabled: options?.disabled ?? false,
       openOnHover: options?.openOnHover ?? false,
       initialExpanded: options?.initialExpanded ?? false,
-      animationDuration: options?.animationDuration ?? 300,
+      animationDuration:
+        options?.animationDuration ?? DEFAULT_ANIMATION_DURATION,
       showAlphaSlider: options?.showAlphaSlider ?? true,
       coreSize: options?.coreSize ?? 32,
       petalSize: options?.petalSize ?? 32,
-      showCoreColor: options?.showCoreColor ?? true,
+      showCoreColor: options?.showCoreColor ?? false,
       sliderPosition: options?.sliderPosition,
       adaptivePositioning: options?.adaptivePositioning ?? true,
       circularBarWidth: options?.circularBarWidth ?? BAR_WIDTH,
@@ -166,6 +191,9 @@ export class BlossomColorPicker {
     this.render();
     this.update();
     this.bindEvents();
+    if (this.isExpanded && this.opts.collapsible) {
+      document.addEventListener('mousedown', this.boundClickOutside);
+    }
   }
 
   // --- Public API ---
@@ -221,8 +249,13 @@ export class BlossomColorPicker {
     if (options.disabled !== undefined) this.opts.disabled = options.disabled;
     if (options.openOnHover !== undefined)
       this.opts.openOnHover = options.openOnHover;
-    if (options.animationDuration !== undefined)
+    if (
+      options.animationDuration !== undefined &&
+      options.animationDuration !== this.opts.animationDuration
+    ) {
       this.opts.animationDuration = options.animationDuration;
+      needsRerender = true;
+    }
     if (options.showCoreColor !== undefined)
       this.opts.showCoreColor = options.showCoreColor;
     if (options.sliderPosition !== undefined)
@@ -292,9 +325,8 @@ export class BlossomColorPicker {
       options.collapsible !== this.opts.collapsible
     ) {
       this.opts.collapsible = options.collapsible;
-      if (!this.opts.collapsible) {
-        this.isExpanded = true;
-      }
+      this.isExpanded = !this.opts.collapsible || this.opts.initialExpanded;
+      needsRerender = true;
     }
 
     if (needsRerender) {
@@ -304,6 +336,11 @@ export class BlossomColorPicker {
     }
 
     this.update();
+    if (this.isExpanded && this.opts.collapsible) {
+      document.addEventListener('mousedown', this.boundClickOutside);
+    } else {
+      document.removeEventListener('mousedown', this.boundClickOutside);
+    }
   }
 
   destroy(): void {
@@ -329,12 +366,15 @@ export class BlossomColorPicker {
     return selectedColor?.s ?? 70;
   }
 
-  private get coreColor(): string {
+  private get selectedColor(): string {
     const val = this.currentValue;
-    if (this.isExpanded && !this.opts.showCoreColor) return '#FFFFFF';
     const lightness = val.lightness ?? sliderValueToLightness(val.saturation);
     const saturation = val.originalSaturation ?? this.baseSaturation;
     return hslaToString(val.hue, saturation, lightness, val.alpha);
+  }
+
+  private get coreColor(): string {
+    return this.opts.showCoreColor ? this.selectedColor : '#FFFFFF';
   }
 
   private get currentLightness(): number {
@@ -346,10 +386,21 @@ export class BlossomColorPicker {
 
   private computeLayout(): void {
     const colors = this.opts.colors;
-    this.normalizedColors =
-      colors && colors.length > 0 ? colors.map(parseColor) : DEFAULT_COLORS;
+    const isDefaultPalette = colors.length === 0;
+    this.normalizedColors = isDefaultPalette
+      ? DEFAULT_COLORS
+      : colors.map(parseColor);
 
     this.layers = organizeColorsIntoLayers(this.normalizedColors);
+    if (isDefaultPalette) {
+      // Match the reference bloom: yellow at 12 o'clock, then warm to cool
+      // colors clockwise. Preserve the existing layout for custom palettes.
+      this.layers = this.layers.map(layer =>
+        layer.toSorted(
+          (a, b) => clockwiseHueOrder(a.h) - clockwiseHueOrder(b.h)
+        )
+      );
+    }
     this.allColors = this.layers.flat();
 
     this.layerPrefixCounts = [0];
@@ -364,7 +415,9 @@ export class BlossomColorPicker {
       this.opts.coreSize,
       this.opts.petalSize
     );
-    this.layerRotations = calculateLayerRotations(this.layers);
+    this.layerRotations = isDefaultPalette
+      ? this.layers.map(() => 0)
+      : calculateLayerRotations(this.layers);
     this.barRadius = calculateBarRadius(
       this.layerRadii,
       this.opts.petalSize,
@@ -397,10 +450,40 @@ export class BlossomColorPicker {
       setStyles(this.containerEl, {
         left: '50%',
         top: '50%',
+        width: `${this.containerSize}px`,
+        height: `${this.containerSize}px`,
+        transform: 'translate(-50%, -50%)',
+        pointerEvents: 'none',
       });
 
       this.rootEl.appendChild(this.containerEl);
       this.container.appendChild(this.rootEl);
+    }
+
+    setStyles(this.rootEl, {
+      width: `${this.opts.coreSize}px`,
+      height: `${this.opts.coreSize}px`,
+    });
+
+    // Trigger button for collapsible mode
+    if (this.opts.collapsible && !this.triggerBtn) {
+      this.triggerBtn = createElement('button', undefined, {
+        type: 'button',
+        'aria-label': 'Open color picker',
+        'aria-expanded': String(this.isExpanded),
+        tabIndex: '0',
+      });
+      this.triggerBtn.className = 'bcp-core bcp-trigger-btn';
+      setStyles(this.triggerBtn, {
+        width: `${this.opts.coreSize}px`,
+        height: `${this.opts.coreSize}px`,
+        backgroundColor: this.selectedColor,
+      });
+      this.triggerBtn.addEventListener('click', () => {
+        if (this.opts.disabled) return;
+        this.toggle();
+      });
+      this.rootEl.insertBefore(this.triggerBtn, this.containerEl);
     }
 
     // Background
@@ -424,7 +507,6 @@ export class BlossomColorPicker {
       const layerColors = this.layers[layerIdx];
       const radius = this.layerRadii[layerIdx];
       const rotation = this.layerRotations[layerIdx];
-      const previousItemsCount = this.layerPrefixCounts[layerIdx];
       const totalPetals = layerColors.length;
       const totalLayers = this.layers.length;
       const baseZ = (totalLayers - layerIdx) * 100;
@@ -450,8 +532,21 @@ export class BlossomColorPicker {
 
       for (let index = 0; index < layerColors.length; index++) {
         const color = layerColors[index];
-        const staggerDelay =
-          previousItemsCount * PETAL_STAGGER + index * PETAL_STAGGER;
+        // Every layer fans open over the same window. The outermost layer
+        // sweeps clockwise and each layer inside it alternates direction, so
+        // the fans meet again where they started.
+        const sweepsClockwise = (totalLayers - 1 - layerIdx) % 2 === 0;
+        const sweepOrder = sweepsClockwise ? index : totalPetals - 1 - index;
+        // The sweep starts brisk and slows towards its last petals.
+        const sweepProgress = sweepOrder / Math.max(1, totalPetals - 1);
+        const staggerDelay = bloomTime(
+          sweepProgress ** PETAL_SWEEP_EASE * PETAL_SWEEP,
+          this.opts.animationDuration
+        );
+        const openEasing = petalSpringEasing(
+          PETAL_OVERSHOOT_FIRST +
+            (PETAL_OVERSHOOT_LAST - PETAL_OVERSHOOT_FIRST) * sweepProgress
+        );
 
         if (index === bottomIndex) {
           // Bottom petal split trick:
@@ -470,6 +565,7 @@ export class BlossomColorPicker {
             radius,
             animationDuration: this.opts.animationDuration,
             staggerDelay,
+            openEasing,
             zIndex: baseZ - 1, // Lowest
             rotationOffset: rotation,
             alpha: 1,
@@ -490,6 +586,7 @@ export class BlossomColorPicker {
             radius,
             animationDuration: this.opts.animationDuration,
             staggerDelay,
+            openEasing,
             zIndex: getPetalZIndex(
               index,
               bottomIndex,
@@ -518,6 +615,7 @@ export class BlossomColorPicker {
             radius,
             animationDuration: this.opts.animationDuration,
             staggerDelay,
+            openEasing,
             zIndex: getPetalZIndex(
               index,
               bottomIndex,
@@ -548,6 +646,7 @@ export class BlossomColorPicker {
               radius,
               animationDuration: this.opts.animationDuration,
               staggerDelay,
+              openEasing,
               zIndex: baseZ + totalPetals + 20,
               rotationOffset: rotation,
               alpha: 0,
@@ -584,6 +683,7 @@ export class BlossomColorPicker {
               radius,
               animationDuration: this.opts.animationDuration,
               staggerDelay,
+              openEasing,
               zIndex: getPetalZIndex(
                 index,
                 bottomIndex,
@@ -634,7 +734,7 @@ export class BlossomColorPicker {
 
   private update(): void {
     const val = this.currentValue;
-    const duration = this.opts.animationDuration;
+    const t = (ms: number) => bloomTime(ms, this.opts.animationDuration);
 
     // Adaptive positioning — compute only on expand transition, not during every update.
     // Using rootEl (stable, small) instead of containerEl (animating, shifting) prevents jitter.
@@ -658,14 +758,62 @@ export class BlossomColorPicker {
       this.effectivePosition = this.opts.sliderPosition || 'right';
     }
 
-    // Container size + shift
+    // The floating layer stays mounted so each part can follow its own timing.
+    // As a unit it only swells open / folds shut (individual `scale`, anchored
+    // on the trigger) and slides to its adaptive position (`transform`).
+    const showsBloom = this.isExpanded || !this.opts.collapsible;
+    const transitionStr = this.isFirstRender
+      ? 'none'
+      : this.isExpanded
+        ? `scale ${t(BLOOM_SCALE_DURATION)}ms ${BLOOM_OPEN_EASING} ${t(BLOOM_SCALE_DELAY)}ms, transform ${t(BLOOM_SCALE_DELAY + BLOOM_SCALE_DURATION)}ms ${BLOOM_OPEN_EASING}`
+        : `scale ${t(COLLAPSE_DURATION)}ms ${BLOOM_CLOSE_EASING} ${t(COLLAPSE_DELAY)}ms, transform ${t(COLLAPSE_DURATION)}ms ${BLOOM_CLOSE_EASING} ${t(COLLAPSE_DELAY)}ms`;
+
     setStyles(this.containerEl, {
-      width: `${this.isExpanded ? this.containerSize : this.opts.coreSize}px`,
-      height: `${this.isExpanded ? this.containerSize : this.opts.coreSize}px`,
+      width: `${this.containerSize}px`,
+      height: `${this.containerSize}px`,
+      transformOrigin: '0 0',
       transform: `translate(calc(-50% + ${this.shiftOffset.x}px), calc(-50% + ${this.shiftOffset.y}px))`,
-      transition: `width ${duration}ms ${BLOOM_EASING}, height ${duration}ms ${BLOOM_EASING}, transform ${duration}ms ${BLOOM_EASING}`,
-      zIndex: this.isExpanded ? '50' : '0',
+      scale: showsBloom ? '1' : String(BLOOM_COLLAPSED_SCALE),
+      opacity: '1',
+      pointerEvents: showsBloom ? 'auto' : 'none',
+      transition: transitionStr,
+      zIndex: '50',
     });
+
+    // Keeps the stylesheet's hover / press transitions alive next to the inline ones.
+    const triggerHover =
+      'transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease';
+
+    if (this.opts.collapsible) {
+      this.containerEl.inert = !this.isExpanded;
+      this.containerEl.setAttribute('aria-hidden', String(!this.isExpanded));
+
+      if (this.triggerBtn) {
+        this.triggerBtn.disabled = this.opts.disabled;
+        this.triggerBtn.tabIndex = this.isExpanded ? -1 : 0;
+        this.triggerBtn.setAttribute('aria-expanded', String(this.isExpanded));
+        this.triggerBtn.setAttribute('aria-hidden', String(this.isExpanded));
+        setStyles(this.triggerBtn, {
+          backgroundColor: this.selectedColor,
+          opacity: this.isExpanded ? '0' : '1',
+          // Shrinks only once it is hidden, then pops back in on close.
+          scale: this.isExpanded ? String(TRIGGER_COLLAPSED_SCALE) : '1',
+          pointerEvents: this.isExpanded ? 'none' : 'auto',
+          transition: `${triggerHover}, ${
+            this.isFirstRender
+              ? 'opacity 0ms, scale 0ms'
+              : this.isExpanded
+                ? `opacity ${t(TRIGGER_FADE_DURATION)}ms ease, scale 0ms linear ${t(TRIGGER_FADE_DURATION)}ms`
+                : `opacity ${t(TRIGGER_FADE_DURATION)}ms ease ${t(TRIGGER_POP_DELAY)}ms, scale ${t(TRIGGER_POP_DURATION)}ms ${TRIGGER_POP_EASING} ${t(TRIGGER_POP_DELAY)}ms`
+          }`,
+        });
+      }
+    } else {
+      this.containerEl.inert = false;
+      this.containerEl.removeAttribute('aria-hidden');
+    }
+
+    this.isFirstRender = false;
 
     // Background
     this.backgroundRenderer.update(
@@ -716,10 +864,10 @@ export class BlossomColorPicker {
   }
 
   private bindEvents(): void {
-    this.containerEl.addEventListener('mouseenter', () => {
+    this.rootEl.addEventListener('mouseenter', () => {
       this.handleMouseEnter();
     });
-    this.containerEl.addEventListener('mouseleave', () => {
+    this.rootEl.addEventListener('mouseleave', () => {
       this.handleMouseLeave();
     });
     this.containerEl.addEventListener('mousemove', this.boundMouseMove);
@@ -784,6 +932,14 @@ export class BlossomColorPicker {
       this.isHovering,
       this.opts.disabled
     );
+
+    if (this.triggerBtn) {
+      this.triggerBtn.disabled = this.opts.disabled;
+      this.triggerBtn.setAttribute('aria-expanded', String(this.isExpanded));
+      setStyles(this.triggerBtn, {
+        backgroundColor: this.selectedColor,
+      });
+    }
   }
 
   private destroyInner(): void {
@@ -797,9 +953,17 @@ export class BlossomColorPicker {
     this.arcSliderRenderer = null;
     this.coreButtonRenderer?.destroy();
     this.backgroundRenderer?.destroy();
+
+    if (this.triggerBtn) {
+      this.triggerBtn.remove();
+      this.triggerBtn = null;
+    }
   }
 
   private setExpanded(expanded: boolean): void {
+    const focusWasOnTrigger = document.activeElement === this.triggerBtn;
+    const focusWasInPicker = this.containerEl.contains(document.activeElement);
+
     if (!this.opts.collapsible) {
       this.isExpanded = true;
     } else {
@@ -813,11 +977,21 @@ export class BlossomColorPicker {
     }
 
     this.update();
+
+    if (this.isExpanded && focusWasOnTrigger) {
+      this.coreButtonRenderer.el.focus();
+    } else if (!this.isExpanded && focusWasInPicker) {
+      this.triggerBtn?.focus();
+    }
   }
 
   private handleClickOutside(e: MouseEvent): void {
     if (!this.opts.collapsible) return;
-    if (this.containerEl && !this.containerEl.contains(e.target as Node)) {
+    const target = e.target as Node;
+    if (this.triggerBtn && this.triggerBtn.contains(target)) {
+      return;
+    }
+    if (this.containerEl && !this.containerEl.contains(target)) {
       this.setExpanded(false);
     }
   }
