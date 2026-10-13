@@ -37,6 +37,17 @@
   - `@dayflow/blossom-color-picker-svelte` -> `1.3.0`
   - `@dayflow/blossom-color-picker-angular` -> `1.3.0`
 
+## v2.2.1 (2026-05-05)
+
+- Removed a leftover debug `console.log` from the core package entry (#8, thanks @mertarica).
+- Website: shared docs layout across locales, added the Dayflow Calendar link, and updated the basic demo.
+- Bumped package versions for this release:
+  - `@dayflow/blossom-color-picker` -> `2.2.1`
+  - `@dayflow/blossom-color-picker-react` -> `1.2.1`
+  - `@dayflow/blossom-color-picker-vue` -> `1.2.1`
+  - `@dayflow/blossom-color-picker-svelte` -> `1.2.1`
+  - `@dayflow/blossom-color-picker-angular` -> `1.2.1`
+
 ## v2.2.0 (2026-03-31)
 
 ### New Features
